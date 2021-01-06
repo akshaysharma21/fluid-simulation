@@ -1,0 +1,203 @@
+<html>
+    <title>WebGl - drawing on canvas</title>
+    <body style="margin: 0px;" onkeyup= "keyPress(event)">
+        <canvas id="draw-surface" width="800" height="600" onmousedown="mouseDown(event)" onmousemove="mouseDragged(event)" onmouseup="mouseUp()">
+            your browser does not support HTML5
+        </canvas>
+        <br>
+
+        <script type="x-shader/x-fragment" id="fragmentShader">
+            precision mediump float;
+
+            varying vec2 texCoord;
+            uniform sampler2D tex;
+
+            void main()
+            {
+                gl_FragColor = texture2D(tex, texCoord);
+            }
+        </script>
+
+        <script type="x-shader/x-fragment" id="fadeFragmentShader">
+            precision mediump float;
+
+            varying vec2 texCoord;
+            uniform sampler2D texture;
+
+            void main(){
+                gl_FragColor = texture2D(texture, texCoord)-vec4(0.00005,0.00005,0.00005,0.0); 
+            }
+        </script>
+        <script type="x-shader/x-fragment" id="splatShader">
+            precision mediump float;
+            precision mediump sampler2D;
+    
+            varying vec2 texCoord;
+    
+            uniform sampler2D tex;
+            uniform vec2 point;
+            uniform float radius;
+            uniform vec3 color;
+    
+            void main ()
+            {
+              vec2 p = /*vec2(0.0,0.0);*/point.xy - texCoord;
+              vec3 base = texture2D(tex, texCoord).xyz;
+              vec3 splat = color * exp(-dot(p, p)/ radius);
+              gl_FragColor = vec4(base + splat, 1.0);
+            }
+        </script>
+        
+        <script type="x-shader/x-fragment" id="advectShader">
+            precision mediump float;
+            precision mediump sampler2D;
+    
+            uniform sampler2D advectTex;
+            uniform sampler2D inputTex;
+    
+            uniform float timeStep;
+            uniform vec2 texSize;
+    
+            varying vec2 texCoord;
+            vec4 bilerp (sampler2D sam, vec2 uv, vec2 tsize) {
+              vec4 s;
+              vec2 st = uv / tsize - 0.5;
+              s.xy = floor(st) + 0.5;
+              s.zw = s.xy + 1.0;
+              vec2 t = fract(st);
+    
+              vec4 a = texture2D(sam, s.xy * tsize);
+              vec4 b = texture2D(sam, s.zy * tsize);
+              vec4 c = texture2D(sam, s.xw * tsize);
+              vec4 d = texture2D(sam, s.zw * tsize);
+    
+              return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+            }
+    
+            void main()
+            {
+              vec2 pos = texCoord - timeStep * texture2D(inputTex, texCoord).xy * texSize;
+              gl_FragColor = bilerp(advectTex, pos, texSize);
+            }
+          </script>
+          <script type="x-shader/x-vertex" id="baseVertexShader">
+            precision mediump float;
+    
+            attribute vec2 vertPosition;
+    
+            varying vec2 texCoord;
+            varying vec2 left;
+            varying vec2 right;
+            varying vec2 top;
+            varying vec2 bottom;
+    
+            uniform vec2 texSize;
+    
+            void main()
+            {
+              texCoord = vertPosition * 0.5 + 0.5;
+              left = texCoord - vec2(texSize.x, 0.0);
+              right = texCoord + vec2(texSize.x, 0.0);
+              top = texCoord + vec2(0.0, texSize.y);
+              bottom = texCoord - vec2(0.0, texSize.y);
+    
+              gl_Position = vec4(vertPosition, 0.0, 1.0);
+            }
+          </script>
+
+          <script type="x-shader/x-fragment" id="divergenceShader">
+            precision mediump float;
+    
+            varying vec2 texCoord;
+            varying highp vec2 left;
+            varying highp vec2 right;
+            varying highp vec2 top;
+            varying highp vec2 bottom;
+    
+            uniform sampler2D inputVelocity;
+    
+            void main()
+            {
+              float L = texture2D(inputVelocity, left).x;
+              float R = texture2D(inputVelocity, right).x;
+              float T = texture2D(inputVelocity, top).y;
+              float B = texture2D(inputVelocity, bottom).y;
+              vec2 C = texture2D(inputVelocity, texCoord).xy;
+                
+              if (left.x < 0.0) {
+                L = -C.x;
+              }
+              if (right.x > 1.0) {
+                R = -C.x;
+              }
+              if (top.y > 1.0) {
+                 T = -C.y;
+              }
+              if (bottom.y < 0.0) {
+                B = -C.y;
+              }
+
+              float diverge = 0.5*(R-L+T-B);
+              gl_FragColor = vec4(diverge, 0.0,0.0,1.0);
+            }
+          </script>
+
+          <script type="x-shader/x-fragment" id="jacobiShader">
+            precision mediump float;
+            precision mediump sampler2D;
+    
+            varying vec2 texCoord;
+            varying vec2 left;
+            varying vec2 right;
+            varying vec2 top;
+            varying vec2 bottom;
+
+            uniform float alpha;
+            uniform float inverseBeta;
+    
+            uniform sampler2D uPressure;
+            uniform sampler2D uDivergence;
+    
+            void main()
+            {
+              float L = texture2D(uPressure, left).x;
+              float R = texture2D(uPressure, right).x;
+              float T = texture2D(uPressure, top).x;
+              float B = texture2D(uPressure, bottom).x;
+              
+              float divergence = texture2D(uDivergence, texCoord).x;
+              float pressure = (L + R + B + T - alpha*divergence) * inverseBeta;
+              gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
+            }
+          </script>
+
+          <script type="x-shader/x-fragment" id="gradientSubtractShader">
+            precision mediump float;
+            precision mediump sampler2D;
+    
+            varying vec2 texCoord;
+            varying vec2 left;
+            varying vec2 right;
+            varying vec2 top;
+            varying vec2 bottom;
+    
+            uniform sampler2D velocity;
+            uniform sampler2D pressure;
+    
+            void main ()
+            {
+              float pL = texture2D(pressure, left).x;
+              float pR = texture2D(pressure, right).x;
+              float pT = texture2D(pressure, top).x;
+              float pB = texture2D(pressure, bottom).x;
+    
+              vec2 v = texture2D(velocity, texCoord).xy;
+              v.xy -= vec2(pR - pL, pT - pB);
+              gl_FragColor = vec4(v, 0.0, 1.0);
+            }
+        </script>
+
+        <script src="gl-matrix.js"></script>
+        <script src="fadeDraw.js"></script>
+    </body>
+</html>
