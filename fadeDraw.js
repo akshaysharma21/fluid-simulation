@@ -343,8 +343,13 @@ var keyPress = function(event){
     }
   }
   if(event.key=="ArrowDown"){
-    if(splatRadius>=0.00001 || splatRadius-0.00005>0.00001){
-      splatRadius-=0.00005;
+    if(splatRadius>=0.00001){
+      if(splatRadius-0.00005>0.00001){
+        splatRadius-=0.00005;
+      }
+      else{
+        splatRadius = 0.00001;
+      }
     }
   }
   if(event.key==" "){
