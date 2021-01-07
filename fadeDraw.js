@@ -2,7 +2,7 @@ var canvas;
 var gl;
 var floatExt;
 var supportLinear;
-const JACOBI_ITERATIONS = 60;
+const JACOBI_ITERATIONS = 30;
 let time = 0.01;
 let color=[0.9, 0.05, 0.05];
 let splatRadius = 0.0001;
