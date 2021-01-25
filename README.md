@@ -2,6 +2,10 @@
 
 A GPU based fluid simulator buit using webGl. 
 
+# Sample Image:
+
+![Sample](./demo.png)
+
 ## Interactive Demo:
 
 **Controls:**
